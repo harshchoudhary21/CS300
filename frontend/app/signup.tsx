@@ -1,16 +1,17 @@
 // app/signup.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { Link, router } from 'expo-router';
 import Animated, { FadeInDown, FadeIn, SlideInRight } from 'react-native-reanimated';
 import { Mail, Lock, User, Phone, IdCard, ArrowRight, ChevronLeft, Camera } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import styles from './styles/signup.style';
 
 // Import Firebase config
 import { auth, db } from '../services/firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { setDoc, doc } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
@@ -26,6 +27,45 @@ export default function SignUpScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Clear storage when component mounts
+  useEffect(() => {
+    const clearStorageData = async () => {
+      try {
+        console.log('Clearing previous session data from storage...');
+        
+        // Get all keys from AsyncStorage
+        const allKeys = await AsyncStorage.getAllKeys();
+        
+        // Filter keys to remove based on patterns
+        const keysToRemove = allKeys.filter(key => 
+          // Match Firebase auth user data with any API key
+          key.startsWith('firebase:authUser:') || 
+          // Match other session related keys
+          ['refreshToken', 'userId', 'userName', 'userToken', 'userData', 'securityData'].includes(key)
+        );
+        
+        // Remove the matched keys
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+          console.log(`Cleared ${keysToRemove.length} items from storage`);
+        } else {
+          console.log('No session data found to clear');
+        }
+        
+        // Sign out current user if any
+        if (auth.currentUser) {
+          await signOut(auth);
+          console.log('Signed out previous user session');
+        }
+      } catch (error) {
+        console.error('Error clearing storage:', error);
+        // Continue anyway - this shouldn't block signup
+      }
+    };
+    
+    clearStorageData();
+  }, []);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -44,6 +84,35 @@ export default function SignUpScreen() {
     try {
       // Reset error state
       setError(null);
+      
+      // Clear any existing storage again right before signup attempt
+      try {
+        // Get all keys from AsyncStorage
+        const allKeys = await AsyncStorage.getAllKeys();
+        
+        // Filter keys to remove based on patterns
+        const keysToRemove = allKeys.filter(key => 
+          // Match Firebase auth user data with any API key
+          key.startsWith('firebase:authUser:') || 
+          // Match other session related keys
+          ['refreshToken', 'userId', 'userName', 'userToken', 'userData', 'securityData'].includes(key)
+        );
+        
+        // Remove the matched keys
+        if (keysToRemove.length > 0) {
+          await AsyncStorage.multiRemove(keysToRemove);
+          console.log(`Cleared ${keysToRemove.length} items before signup attempt`);
+        }
+        
+        // Also sign out if there's any existing session
+        if (auth.currentUser) {
+          await signOut(auth);
+          console.log('Signed out previous user session');
+        }
+      } catch (storageError) {
+        console.error('Error clearing storage before signup:', storageError);
+        // Continue with signup anyway
+      }
       
       // Validate form inputs
       if (!name) {
@@ -86,9 +155,13 @@ export default function SignUpScreen() {
         const user = userCredential.user;
         console.log("User created in Auth:", user.uid);
 
+        // Store minimal user info for persistence
+        await AsyncStorage.setItem('userId', user.uid);
+        await AsyncStorage.setItem('userName', 'Student');
+
         // Create user document in Firestore
         try {
-          await setDoc(doc(db, "users", user.uid), {
+          const userData = {
             name,
             email,
             rollNumber,
@@ -97,12 +170,17 @@ export default function SignUpScreen() {
             role: "student",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          });
+          };
+          
+          await setDoc(doc(db, "users", user.uid), userData);
           
           console.log("User document created in Firestore");
           
-          // Changed: Navigate directly to student dashboard instead of showing alert
-          router.replace('./student/dashboard');
+          // Store user data in AsyncStorage
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+          
+          // Navigate directly to student dashboard
+          router.replace('/student/dashboard');
           
         } catch (firestoreError) {
           console.error("Firestore error:", firestoreError);
@@ -129,6 +207,15 @@ export default function SignUpScreen() {
           setError('Network error. Please check your internet connection and try again.');
         } else {
           setError('Authentication error: ' + authError.message);
+        }
+        
+        // If auth fails, ensure any partial auth is cleaned up
+        try {
+          if (auth.currentUser) {
+            await signOut(auth);
+          }
+        } catch (signOutError) {
+          console.error('Error signing out after failed signup:', signOutError);
         }
       }
     } catch (error: any) {

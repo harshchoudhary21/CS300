@@ -11,6 +11,7 @@ import LateEntriesCard from './components/LateEntriesCard';
 import RecentActivityCard from './components/RecentActivityCard';
 import ProfileModal from './components/ProfileModal';
 import styles from '../styles/dashboard.style';
+import Notifications from './components/Notifications';
 
 // Firebase
 import { auth, db } from '../../services/firebaseConfig';
@@ -153,6 +154,7 @@ export default function StudentDashboard() {
         <LateEntriesCard />
         
         <RecentActivityCard />
+        <Notifications userId={userData?.id} />
       </ScrollView>
       
       <ProfileModal

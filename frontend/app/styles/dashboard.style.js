@@ -12,6 +12,10 @@ export default StyleSheet.create({
     top: 0,
     bottom: 0,
   },
+  label: {
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -19,6 +23,12 @@ export default StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  noEntriesText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 10,
   },
   menuButton: {
     width: 40,

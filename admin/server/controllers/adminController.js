@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { db } = require('../config/firebaseAdmin');
+const { db, admin } = require('../config/firebaseAdmin');
 
 // Initialize admin if not exists
 const initializeAdmin = async () => {
@@ -26,6 +26,22 @@ const initializeAdmin = async () => {
         role: 'admin',
         createdAt: new Date()
       });
+
+      // Also create admin user in Firebase Auth
+      try {
+        await admin.auth().createUser({
+          email: adminEmail,
+          password: adminPassword,
+          displayName: 'Admin',
+        });
+        console.log('Admin user created in Firebase Auth');
+      } catch (authError) {
+        if (authError.code === 'auth/email-already-exists') {
+          console.log('Admin user already exists in Firebase Auth');
+        } else {
+          console.error('Error creating admin in Firebase Auth:', authError);
+        }
+      }
       
       console.log('Default admin created successfully!');
       return { success: true, message: 'Admin initialized successfully' };
@@ -91,12 +107,8 @@ const loginAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
-// Add this function to your existing adminController.js file
 
-// Register security personnel
-// Update the registerSecurity function to include password
-
-// Register security personnel
+// Register security personnel in 'users' collection
 const registerSecurity = async (req, res) => {
   try {
     const { name, phone, email, securityId, password } = req.body;
@@ -109,15 +121,15 @@ const registerSecurity = async (req, res) => {
       });
     }
     
-    // Check if security with this email or ID already exists
-    const securityRef = db.collection('security');
-    const emailSnapshot = await securityRef.where('email', '==', email).get();
-    const idSnapshot = await securityRef.where('securityId', '==', securityId).get();
+    // Check if security with this email or ID already exists in users collection
+    const usersRef = db.collection('users');
+    const emailSnapshot = await usersRef.where('email', '==', email).get();
+    const idSnapshot = await usersRef.where('securityId', '==', securityId).where('role', '==', 'security').get();
     
     if (!emailSnapshot.empty) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Security personnel with this email already exists' 
+        message: 'User with this email already exists' 
       });
     }
     
@@ -128,11 +140,11 @@ const registerSecurity = async (req, res) => {
       });
     }
     
-    // Hash the password
+    // Hash the password for Firestore
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
-    // Create security document
+    // Create security document in users collection
     const securityData = {
       name,
       phone,
@@ -140,10 +152,47 @@ const registerSecurity = async (req, res) => {
       securityId,
       password: hashedPassword,
       status: 'active',
+      role: 'security',
+      userType: 'security', // Add userType for easier filtering
       createdAt: new Date()
     };
     
-    const docRef = await securityRef.add(securityData);
+    const docRef = await usersRef.add(securityData);
+    
+    // Also create user in Firebase Auth
+    try {
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: name,
+      });
+      
+      // Set custom claims to identify this user as security
+      await admin.auth().setCustomUserClaims(userRecord.uid, {
+        role: 'security',
+        securityId
+      });
+      
+      // Update the document with Firebase Auth UID
+      await docRef.update({
+        uid: userRecord.uid
+      });
+      
+      console.log('Security user created in Firebase Auth with custom claims');
+    } catch (authError) {
+      console.error('Firebase user creation error:', authError);
+      // If Firebase Auth creation fails, we should delete the Firestore record
+      try {
+        await docRef.delete();
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Error creating security user in authentication system', 
+          error: authError.message 
+        });
+      } catch (deleteError) {
+        console.error('Error deleting security record after auth failure:', deleteError);
+      }
+    }
     
     // Return success response with the created security data (exclude password)
     const { password: _, ...securityDataWithoutPassword } = securityData;
@@ -167,11 +216,12 @@ const registerSecurity = async (req, res) => {
   }
 };
 
-// Get all security personnel
+// Get all security personnel from users collection
 const getAllSecurity = async (req, res) => {
   try {
-    const securityRef = db.collection('security');
-    const snapshot = await securityRef.get();
+    // Query users collection for security personnel
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('role', '==', 'security').get();
     
     if (snapshot.empty) {
       return res.status(200).json({ 
@@ -183,9 +233,13 @@ const getAllSecurity = async (req, res) => {
     
     const securityList = [];
     snapshot.forEach(doc => {
+      const data = doc.data();
+      // Remove password from response
+      const { password, ...securityData } = data;
+      
       securityList.push({
         id: doc.id,
-        ...doc.data()
+        ...securityData
       });
     });
     
@@ -204,7 +258,7 @@ const getAllSecurity = async (req, res) => {
   }
 };
 
-// Export the new functions
+// Export the functions
 module.exports = {
   initializeAdmin,
   loginAdmin,
