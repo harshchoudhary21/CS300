@@ -19,13 +19,15 @@ export default function QRCodeCard({ userData }: QRCodeCardProps) {
   // Function to generate QR code data with current timestamp
   const generateQrData = () => {
     if (!userData) return;
-
+    console.log(userData);
+    
     // Create a data object to encode in the QR code
     const qrData = {
       id: userData.id || '',
       name: userData.name || '',
       rollNumber: userData.rollNumber || '',
       email: userData.email || '',
+      url: userData.imageUrl || '',
       timestamp: new Date().toISOString(),
     };
 

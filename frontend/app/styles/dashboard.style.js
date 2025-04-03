@@ -24,6 +24,25 @@ export default StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
+  profilePhotoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+  },
+  profileImagePlaceholder: {
+    width: 100, // Example width
+    height: 100, // Example height
+    borderRadius: 50, // Makes it circular
+    backgroundColor: '#ccc', // Placeholder color
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noEntriesText: {
     fontSize: 16,
     color: '#666',
