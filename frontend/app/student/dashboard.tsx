@@ -11,11 +11,10 @@ import LateEntriesCard from './components/LateEntriesCard';
 import RecentActivityCard from './components/RecentActivityCard';
 import ProfileModal from './components/ProfileModal';
 import styles from '../styles/dashboard.style';
-import Notifications from './components/Notifications';
 
 // Firebase
 import { auth, db } from '../../services/firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
 export default function StudentDashboard() {
   // UI state
@@ -28,6 +27,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [recentNotifications, setRecentNotifications] = useState<any[]>([]);
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -61,8 +61,8 @@ export default function StudentDashboard() {
           id: user.uid
         });
         
-        // Mock notification count - in production, fetch from backend
-        setNotificationCount(Math.floor(Math.random() * 5));
+        // Fetch recent notifications
+        fetchRecentNotifications(user.uid);
         
       } catch (err) {
         console.error('Error fetching user data:', err);
@@ -74,6 +74,30 @@ export default function StudentDashboard() {
 
     fetchUserData();
   }, []);
+
+  const fetchRecentNotifications = async (userId: string) => {
+    try {
+      const notificationsRef = collection(db, 'notifications');
+      const q = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        orderBy('timestamp', 'desc'),
+        // Limit to the latest 3 notifications
+      );
+      const querySnapshot = await getDocs(q);
+
+      const fetchedNotifications = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate?.() || new Date(),
+      }));
+
+      // Set only the latest 3 notifications
+      setRecentNotifications(fetchedNotifications.slice(0, 3));
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
 
   // Profile modal handlers
   const handleProfilePress = () => {
@@ -153,8 +177,8 @@ export default function StudentDashboard() {
         
         <LateEntriesCard />
         
-        <RecentActivityCard />
-        <Notifications userId={userData?.id} />
+        {/* Pass recent notifications to RecentActivityCard */}
+        <RecentActivityCard notifications={recentNotifications} />
       </ScrollView>
       
       <ProfileModal

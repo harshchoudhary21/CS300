@@ -23,7 +23,7 @@ export default function Header({ onMenuPress, userName, notificationCount = 0 }:
       
       <TouchableOpacity 
         style={styles.notificationButton} 
-        // onPress={() => router.push('/student/notifications')}
+        onPress={() => router.push('./components/Notifications')} // Corrected route
       >
         <Bell size={24} color="#FFFFFF" />
         {notificationCount > 0 && (

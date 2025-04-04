@@ -49,6 +49,16 @@ export default StyleSheet.create({
     textAlign: 'center',
     marginVertical: 10,
   },
+  listText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  // Add new styles below
+  timestamp: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
+  },
   menuButton: {
     width: 40,
     height: 40,

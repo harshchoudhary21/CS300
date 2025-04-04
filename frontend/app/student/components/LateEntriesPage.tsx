@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { collection, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../../services/firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
-import styles from '../../styles/dashboard.style';
-import { router, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 const CLOUDINARY_CLOUD_NAME = 'dmzk8rqfh'; // Replace with your Cloudinary cloud name
 const CLOUDINARY_UPLOAD_PRESET = 'proof-upload-preset'; // Replace with your Cloudinary unsigned preset
 
-export default function LateEntriesCard() {
+export default function LateEntriesPage() {
   const [lateEntries, setLateEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [uploadingEntryId, setUploadingEntryId] = useState<string | null>(null); // Track which entry is uploading
   const [selectedImages, setSelectedImages] = useState<{ [key: string]: string }>({}); // Track selected images for each entry
+  const router = useRouter();
 
   useEffect(() => {
     fetchLateEntries();
@@ -137,84 +137,150 @@ export default function LateEntriesCard() {
     }
   };
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Late Entries</Text>
-        <TouchableOpacity onPress={() => router.push('./components/LateEntriesPage')}>
-          <Text style={styles.viewAllText}>View All</Text>
-        </TouchableOpacity>
-      </View>
+  const renderLateEntry = ({ item }: { item: any }) => (
+    <View style={styles.entryCard}>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Date:</Text> {new Date(item.timestamp).toLocaleDateString()}
+      </Text>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Type:</Text> {item.entryType}
+      </Text>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Entered By:</Text> {item.securityName || 'Unknown'}
+      </Text>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Status:</Text> {item.status}
+      </Text>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Verification:</Text> {item.verificationStatus || 'Pending'}
+      </Text>
+      <Text style={styles.entryText}>
+        <Text style={styles.label}>Proof:</Text> {item.proofUrl ? 'Uploaded' : 'Not Uploaded'}
+      </Text>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#66A5FF" />
-      ) : lateEntries.length === 0 ? (
-        <Text style={styles.noEntriesText}>No late entries found.</Text>
-      ) : (
-        lateEntries.slice(0, 3).map((entry) => (
-          <View key={entry.id} style={styles.listItem}>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Date:</Text> {new Date(entry.timestamp).toLocaleDateString()}
+      {/* Show Add File, Remove File, and Upload Proof buttons only if proof is not uploaded */}
+      {!item.proofUrl && (
+        <>
+          <TouchableOpacity
+            style={localStyles.addFileButton}
+            onPress={() => pickImage(item.id)}
+          >
+            <Text style={localStyles.addFileButtonText}>
+              {selectedImages[item.id] ? 'File Added' : 'Add File'}
             </Text>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Type:</Text> {entry.entryType}
-            </Text>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Entered By:</Text> {entry.securityName || 'Unknown'}
-            </Text>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Status:</Text> {entry.status}
-            </Text>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Verification:</Text> {entry.verificationStatus || 'Pending'}
-            </Text>
-            <Text style={styles.listText}>
-              <Text style={styles.label}>Proof:</Text> {entry.proofUrl ? 'Uploaded' : 'Not Uploaded'}
-            </Text>
+          </TouchableOpacity>
 
-            {/* Show Add File, Remove File, and Upload Proof buttons only if proof is not uploaded */}
-            {!entry.proofUrl && (
-              <>
-                <TouchableOpacity
-                  style={localStyles.addFileButton}
-                  onPress={() => pickImage(entry.id)}
-                >
-                  <Text style={localStyles.addFileButtonText}>
-                    {selectedImages[entry.id] ? 'File Added' : 'Add File'}
-                  </Text>
-                </TouchableOpacity>
+          {selectedImages[item.id] && (
+            <>
+              <TouchableOpacity
+                style={localStyles.removeFileButton}
+                onPress={() => removeImage(item.id)}
+              >
+                <Text style={localStyles.removeFileButtonText}>Remove File</Text>
+              </TouchableOpacity>
 
-                {selectedImages[entry.id] && (
-                  <>
-                    <TouchableOpacity
-                      style={localStyles.removeFileButton}
-                      onPress={() => removeImage(entry.id)}
-                    >
-                      <Text style={localStyles.removeFileButtonText}>Remove File</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        localStyles.uploadButton,
-                        uploadingEntryId === entry.id && localStyles.disabledButton,
-                      ]}
-                      onPress={() => handleUploadProof(entry.id)}
-                      disabled={uploadingEntryId === entry.id}
-                    >
-                      <Text style={localStyles.uploadButtonText}>
-                        {uploadingEntryId === entry.id ? 'Uploading...' : 'Upload Proof'}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </>
-            )}
-          </View>
-        ))
+              <TouchableOpacity
+                style={[
+                  localStyles.uploadButton,
+                  uploadingEntryId === item.id && localStyles.disabledButton,
+                ]}
+                onPress={() => handleUploadProof(item.id)}
+                disabled={uploadingEntryId === item.id}
+              >
+                <Text style={localStyles.uploadButtonText}>
+                  {uploadingEntryId === item.id ? 'Uploading...' : 'Upload Proof'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </>
       )}
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#66A5FF" />
+        <Text style={styles.loadingText}>Loading late entries...</Text>
+      </View>
+    );
+  }
+
+  if (lateEntries.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noEntriesText}>No late entries found.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity style={styles.goBackButton} onPress={() => router.push('/student/dashboard')}>
+        <Text style={styles.goBackText}>← Back to Dashboard</Text>
+      </TouchableOpacity>
+      <FlatList
+        data={lateEntries}
+        keyExtractor={(item) => item.id}
+        renderItem={renderLateEntry}
+        contentContainerStyle={styles.listContainer}
+      />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0A1128',
+    padding: 16,
+  },
+  goBackButton: {
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#1A2980',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  goBackText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  listContainer: {
+    paddingBottom: 16,
+  },
+  entryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  entryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  label: {
+    fontWeight: 'bold',
+    color: '#B8C2FF',
+  },
+  loadingText: {
+    color: '#B8C2FF',
+    fontSize: 16,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  noEntriesText: {
+    color: '#B8C2FF',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+});
 
 const localStyles = StyleSheet.create({
   addFileButton: {
