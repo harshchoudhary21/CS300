@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "expo-barcode-scanner": "^13.0.1",
-    "react-router-dom": "^7.4.1"
+    "react-router-dom": "^7.4.1",
+    "expo-camera": "~16.0.18"
   }
 }

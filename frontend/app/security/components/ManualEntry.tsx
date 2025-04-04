@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Alert, ActivityIndicator, Image, Appearance } from 'react-native';
 import { collection, query, where, getDocs, setDoc, doc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../../services/firebaseConfig';
 
@@ -93,6 +93,9 @@ const ManualEntry: React.FC<ManualEntryProps> = ({ visible, onClose, onEntryRegi
     }
   };
 
+  // Get the current theme ('dark' or 'light')
+  const colorScheme = Appearance.getColorScheme();
+
   return (
     <Modal
       visible={visible}
@@ -117,18 +120,43 @@ const ManualEntry: React.FC<ManualEntryProps> = ({ visible, onClose, onEntryRegi
             <ActivityIndicator size="large" color="#66A5FF" />
           ) : studentData ? (
             <View style={styles.studentDetails}>
+              {/* Profile Photo */}
+              <View style={styles.profilePhotoContainer}>
+                {studentData.imageUrl ? (
+                  <Image
+                    source={{ uri: studentData.imageUrl }}
+                    style={[
+                      styles.profileImage,
+                      { borderColor: colorScheme === 'dark' ? '#fff' : '#000' },
+                    ]}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.profileImagePlaceholder,
+                      { borderColor: colorScheme === 'dark' ? '#fff' : '#000' },
+                    ]}
+                  >
+                    <Text style={styles.placeholderText}>No Photo</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Student Details */}
               <Text style={styles.detailLabel}>Name:</Text>
               <Text style={styles.detailValue}>{studentData.name}</Text>
 
               <Text style={styles.detailLabel}>Roll Number:</Text>
               <Text style={styles.detailValue}>{studentData.rollNumber}</Text>
 
-              {studentData.roomNumber && (
+              {studentData.phoneNumber && (
                 <>
-                  <Text style={styles.detailLabel}>Room Number:</Text>
-                  <Text style={styles.detailValue}>{studentData.roomNumber}</Text>
+                  <Text style={styles.detailLabel}>Phone Number:</Text>
+                  <Text style={styles.detailValue}>{studentData.phoneNumber}</Text>
                 </>
               )}
+
             </View>
           ) : null}
 
@@ -205,6 +233,29 @@ const styles = StyleSheet.create({
   },
   studentDetails: {
     marginBottom: 20,
+  },
+  profilePhotoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+  },
+  profileImagePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#666',
+    fontSize: 14,
   },
   detailLabel: {
     color: '#B8C2FF',

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, TextInput, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Modal, Alert, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../../services/firebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc,addDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import { QrCode, Edit, Clock, User } from 'lucide-react-native';
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { QrCode, Edit } from 'lucide-react-native';
 
 // Components
 import Header from './components/Header';
@@ -14,6 +14,12 @@ import Sidebar from './components/Sidebar';
 import ProfileModal from './components/ProfileModal';
 import ManualEntry from './components/ManualEntry';
 import FetchLateEntries from './components/FetchLateEntries';
+import CameraScanner from './components/QRScanner';
+
+interface BarcodeScanningResult {
+  type: string;
+  data: string;
+}
 
 const SecurityDashboard = () => {
   const [name, setName] = useState('Security User');
@@ -23,11 +29,12 @@ const SecurityDashboard = () => {
   const [securityData, setSecurityData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
+  const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [rollNumber, setRollNumber] = useState('');
   const [studentData, setStudentData] = useState<any>(null);
   const [fetchingStudent, setFetchingStudent] = useState(false);
   const [confirmingEntry, setConfirmingEntry] = useState(false);
-  
+  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
 
   useEffect(() => {
     const getSecurityData = async () => {
@@ -58,10 +65,9 @@ const SecurityDashboard = () => {
     }
   };
 
-  // Fetch student details by roll number
-  const fetchStudentDetails = async () => {
-    if (!rollNumber.trim()) {
-      Alert.alert('Error', 'Please enter a valid roll number.');
+  const fetchStudentDetails = async (rollNum: string) => {
+    if (!rollNum.trim()) {
+      Alert.alert('Error', 'Invalid QR code data');
       return;
     }
 
@@ -70,11 +76,11 @@ const SecurityDashboard = () => {
       setStudentData(null);
 
       const studentsRef = collection(db, 'users');
-      const q = query(studentsRef, where('rollNumber', '==', rollNumber.trim()), where('role', '==', 'student'));
+      const q = query(studentsRef, where('rollNumber', '==', rollNum.trim()), where('role', '==', 'student'));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        Alert.alert('Error', `No student found with roll number: ${rollNumber}`);
+        Alert.alert('Error', `No student found with roll number: ${rollNum}`);
         return;
       }
 
@@ -85,6 +91,7 @@ const SecurityDashboard = () => {
       };
 
       setStudentData(student);
+      setConfirmationModalVisible(true); // Show confirmation modal
     } catch (error) {
       console.error('Error fetching student details:', error);
       Alert.alert('Error', 'Failed to fetch student details. Please try again.');
@@ -93,40 +100,56 @@ const SecurityDashboard = () => {
     }
   };
 
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    try {
+      // Parse the QR code data as JSON
+      const qrData = JSON.parse(result.data);
 
-  
+      // Ensure the QR code contains a roll number
+      if (!qrData.rollNumber) {
+        Alert.alert('Error', 'Invalid QR code: Roll number not found.');
+        return;
+      }
+
+      // Use the roll number to fetch student details
+      const rollNum = qrData.rollNumber;
+      setRollNumber(rollNum);
+      fetchStudentDetails(rollNum);
+    } catch (error) {
+      console.error('Error parsing QR code data:', error);
+      Alert.alert('Error', 'Failed to parse QR code data. Please try again.');
+    }
+  };
+
   const confirmLateEntry = async () => {
     if (!studentData) return;
-  
+
     try {
       setConfirmingEntry(true);
-  
+
       const entryId = `${studentData.id}_${Date.now()}`;
-      // Register the late entry in the 'lateEntries' collection
       await setDoc(doc(db, 'lateEntries', entryId), {
         studentId: studentData.id,
         studentName: studentData.name,
         rollNumber: studentData.rollNumber,
         timestamp: serverTimestamp(),
-        entryType: 'Manual',
+        entryType: 'QR',
         status: 'recorded',
-        verificationStatus: 'pending', // New field
-        proofUrl: null, // New field
+        verificationStatus: 'pending',
+        proofUrl: null,
         securityId: auth.currentUser?.uid,
         securityName: auth.currentUser?.displayName || 'Security Officer',
       });
-  
-      // Add a notification for the user in the 'notifications' collection
+
       await addDoc(collection(db, 'notifications'), {
-        userId: studentData.id, // The ID of the student
+        userId: studentData.id,
         message: `Your late entry has been registered by ${auth.currentUser?.displayName || 'Security Officer'}.`,
         timestamp: serverTimestamp(),
-        readStatus: false, // Mark as unread initially
+        readStatus: false,
       });
-  
+
       Alert.alert('Success', `Late entry recorded for ${studentData.name}`);
-      setManualEntryVisible(false);
-      setRollNumber('');
+      setConfirmationModalVisible(false);
       setStudentData(null);
     } catch (error) {
       console.error('Error recording late entry:', error);
@@ -145,11 +168,11 @@ const SecurityDashboard = () => {
         end={{ x: 0, y: 1 }}
       />
 
-    <ManualEntry
+      <ManualEntry
         visible={manualEntryVisible}
-        onClose={() => setManualEntryVisible(false)} onEntryRegistered={function (): void {
-          throw new Error('Function not implemented.');
-        } }      />
+        onClose={() => setManualEntryVisible(false)}
+        onEntryRegistered={() => {}}
+      />
 
       <Sidebar
         isVisible={sidebarVisible}
@@ -166,75 +189,69 @@ const SecurityDashboard = () => {
         loading={loading}
       />
 
+      {/* Camera Scanner Modal */}
       <Modal
-        visible={manualEntryVisible}
+        visible={cameraModalVisible}
+        animationType="slide"
+        onRequestClose={() => setCameraModalVisible(false)}
+      >
+        <CameraScanner
+          visible={cameraModalVisible}
+          onClose={() => setCameraModalVisible(false)}
+          onBarcodeScanned={handleBarcodeScanned}
+        />
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={confirmationModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setManualEntryVisible(false)}
+        onRequestClose={() => setConfirmationModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Manual Entry</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Enter Roll Number"
-              placeholderTextColor="#B8C2FF"
-              value={rollNumber}
-              onChangeText={setRollNumber}
-              editable={!fetchingStudent && !confirmingEntry}
-            />
-
-            {fetchingStudent ? (
-              <ActivityIndicator size="large" color="#66A5FF" />
-            ) : studentData ? (
-              <View style={styles.studentDetails}>
-                <Text style={styles.detailLabel}>Name:</Text>
-                <Text style={styles.detailValue}>{studentData.name}</Text>
-
-                <Text style={styles.detailLabel}>Roll Number:</Text>
-                <Text style={styles.detailValue}>{studentData.rollNumber}</Text>
-
-                {studentData.roomNumber && (
-                  <>
-                    <Text style={styles.detailLabel}>Room Number:</Text>
-                    <Text style={styles.detailValue}>{studentData.roomNumber}</Text>
-                  </>
+            <Text style={styles.modalTitle}>Confirm Late Entry</Text>
+            {studentData && (
+              <>
+                {/* Display Student Photo */}
+                {studentData.imageUrl ? (
+                  <Image
+                    source={{ uri: studentData.imageUrl }}
+                    style={styles.studentPhoto}
+                  />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Text style={styles.photoPlaceholderText}>No Photo</Text>
+                  </View>
                 )}
-              </View>
-            ) : null}
 
+                <Text style={styles.modalText}>
+                  <Text style={styles.label}>Name:</Text> {studentData.name}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.label}>Roll Number:</Text> {studentData.rollNumber}
+                </Text>
+                <Text style={styles.modalText}>
+                  <Text style={styles.label}>Entry Type:</Text> QR
+                </Text>
+              </>
+            )}
             <View style={styles.modalActions}>
-              {!studentData ? (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={fetchStudentDetails}
-                  disabled={fetchingStudent || confirmingEntry}
-                >
-                  <Text style={styles.actionButtonText}>Fetch Details</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={confirmLateEntry}
-                  disabled={confirmingEntry}
-                >
-                  {confirmingEntry ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.actionButtonText}>Confirm Entry</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={confirmLateEntry}
+                disabled={confirmingEntry}
+              >
+                {confirmingEntry ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.cancelButton]}
-                onPress={() => {
-                  setManualEntryVisible(false);
-                  setRollNumber('');
-                  setStudentData(null);
-                }}
-                disabled={fetchingStudent || confirmingEntry}
+                onPress={() => setConfirmationModalVisible(false)}
               >
                 <Text style={styles.actionButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -255,6 +272,7 @@ const SecurityDashboard = () => {
           <Text style={styles.subtitle}>Security Control Panel</Text>
 
           <View style={styles.cardsContainer}>
+            {/* Manual Entry Card */}
             <TouchableOpacity
               style={styles.card}
               onPress={() => setManualEntryVisible(true)}
@@ -266,6 +284,22 @@ const SecurityDashboard = () => {
                 <Text style={styles.cardTitle}>Manual Entry</Text>
                 <Text style={styles.cardText}>
                   Enter roll number to manually record late entry
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* QR Scan Card */}
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => setCameraModalVisible(true)}
+            >
+              <View style={styles.cardIconContainer}>
+                <QrCode size={30} color="#66A5FF" />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Scan QR Code</Text>
+                <Text style={styles.cardText}>
+                  Use camera to scan student QR code
                 </Text>
               </View>
             </TouchableOpacity>
@@ -363,24 +397,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  studentDetails: {
-    marginBottom: 20,
-  },
-  detailLabel: {
+  modalText: {
     color: '#B8C2FF',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  detailValue: {
-    color: '#FFFFFF',
     fontSize: 16,
     marginBottom: 12,
   },
@@ -403,6 +421,32 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: 'rgba(255, 83, 83, 0.8)',
+  },
+  label: {
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  studentPhoto: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  photoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#B8C2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  photoPlaceholderText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 
