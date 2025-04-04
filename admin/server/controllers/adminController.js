@@ -258,10 +258,144 @@ const getAllSecurity = async (req, res) => {
   }
 };
 
-// Export the functions
+const getAllEntries = async (req, res) => {
+  try {
+    const lateEntriesRef = db.collection('lateEntries');
+    const snapshot = await lateEntriesRef.get();
+
+    if (snapshot.empty) {
+      return res.status(200).json({
+        success: true,
+        message: 'No late entries found',
+        entries: [],
+      });
+    }
+
+    const entries = [];
+    snapshot.forEach((doc) => {
+      entries.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      entries,
+    });
+  } catch (error) {
+    console.error('Error fetching late entries:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error when fetching late entries',
+      error: error.message,
+    });
+  }
+};
+
+const updateVerificationStatus = async (req, res) => {
+  try {
+    const { entryId, status } = req.body;
+
+    if (!entryId || !status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide entryId and status',
+      });
+    }
+
+    const entryRef = db.collection('lateEntries').doc(entryId);
+    const entryDoc = await entryRef.get();
+
+    if (!entryDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Late entry not found',
+      });
+    }
+
+    const entryData = entryDoc.data();
+
+    // Update the verification status
+    await entryRef.update({
+      verificationStatus: status,
+    });
+
+    // Send notification to the student
+    await db.collection('notifications').add({
+      userId: entryData.studentId,
+      message: `Your late entry has been ${status} by the admin.`,
+      timestamp: new Date(),
+      readStatus: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Late entry verification status updated to ${status}`,
+    });
+  } catch (error) {
+    console.error('Error updating verification status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error when updating verification status',
+      error: error.message,
+    });
+  }
+};
+
+const getAllStudents = async (req, res) => {
+  try {
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('role', '==', 'student').get();
+
+    if (snapshot.empty) {
+      return res.status(200).json({
+        success: true,
+        message: 'No students found',
+        students: [],
+      });
+    }
+
+    // Fetch all students and sort them based on the first two digits of their roll number
+    const students = [];
+    snapshot.forEach((doc) => {
+      students.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    students.sort((a, b) => {
+      const rollAFirstTwo = parseInt(a.rollNumber.substring(0, 2), 10);
+      const rollBFirstTwo = parseInt(b.rollNumber.substring(0, 2), 10);
+    
+      if (rollAFirstTwo === rollBFirstTwo) {
+        return a.rollNumber.localeCompare(b.rollNumber);
+      }
+    
+      return rollAFirstTwo - rollBFirstTwo;
+    });
+
+    res.status(200).json({
+      success: true,
+      students,
+    });
+  } catch (error) {
+    console.error('Error fetching students:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error when fetching students',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   initializeAdmin,
   loginAdmin,
   registerSecurity,
-  getAllSecurity
+  getAllSecurity,
+  getAllEntries,
+  updateVerificationStatus,
+  getAllStudents, // New function
 };

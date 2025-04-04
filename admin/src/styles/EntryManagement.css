@@ -1,0 +1,40 @@
+.entry-management {
+  padding: 20px;
+}
+
+.entries-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.entries-table th, .entries-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.entries-table th {
+  background-color: #f4f4f4;
+  font-weight: bold;
+}
+
+.accept-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.reject-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.accept-button:hover, .reject-button:hover {
+  opacity: 0.8;
+}
