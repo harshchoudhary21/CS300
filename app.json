@@ -1,5 +1,15 @@
 {
   "plugins": [
     "expo-barcode-scanner"
-  ]
+  ],
+  "extra": {
+    "eas": {
+      "projectId": "090d7eb7-4541-41d6-b73e-0702775b8a38"
+    }
+  },
+  "expo": {
+    "android": {
+      "package": "com.harsh_ch21.cs300"
+    }
+  }
 }

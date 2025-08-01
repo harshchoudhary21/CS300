@@ -35,6 +35,10 @@ export default StyleSheet.create({
   decorCircle: { position: 'absolute', borderRadius: 300, opacity: 0.15, zIndex: 0 },
   decorCircle1: { width: width * 0.7, height: width * 0.7, backgroundColor: '#66A5FF', top: -width * 0.3, right: -width * 0.3 },
   decorCircle2: { width: width * 0.5, height: width * 0.5, backgroundColor: '#4C63D2', bottom: -width * 0.25, left: -width * 0.25 },
+  idCardPicker: {
+    marginBottom: 30,               // a little more breathing room
+    borderColor: '#FFD700',         // gold border for emphasis
+  },
   // Add these styles to your existing stylesheet:
 errorText: { 
   color: '#FF6A8E', 

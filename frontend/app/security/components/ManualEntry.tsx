@@ -14,6 +14,7 @@ const ManualEntry: React.FC<ManualEntryProps> = ({ visible, onClose, onEntryRegi
   const [studentData, setStudentData] = useState<any>(null);
   const [fetchingStudent, setFetchingStudent] = useState(false);
   const [confirmingEntry, setConfirmingEntry] = useState(false);
+  const [idCardModalVisible, setIdCardModalVisible] = useState(false); // new state
 
   // Fetch student details by roll number
   const fetchStudentDetails = async () => {
@@ -27,7 +28,11 @@ const ManualEntry: React.FC<ManualEntryProps> = ({ visible, onClose, onEntryRegi
       setStudentData(null);
 
       const studentsRef = collection(db, 'users');
-      const q = query(studentsRef, where('rollNumber', '==', rollNumber.trim()), where('role', '==', 'student'));
+      const q = query(
+        studentsRef,
+        where('rollNumber', '==', rollNumber.trim()),
+        where('role', '==', 'student')
+      );
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -157,8 +162,33 @@ const ManualEntry: React.FC<ManualEntryProps> = ({ visible, onClose, onEntryRegi
                 </>
               )}
 
+              {/* ID Card View Option */}
+              {studentData.idCardURL && (
+                <>
+                  <Text style={styles.detailLabel}>Student ID Card:</Text>
+                  <TouchableOpacity onPress={() => setIdCardModalVisible(true)}>
+                    <Text style={[styles.detailValue, styles.idCardLink]}>View ID Card</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
             </View>
           ) : null}
+
+          {/* ID Card Modal */}
+          <Modal
+            visible={idCardModalVisible}
+            transparent={true}
+            onRequestClose={() => setIdCardModalVisible(false)}
+          >
+            <TouchableOpacity style={styles.modalOverlay} onPress={() => setIdCardModalVisible(false)}>
+              <Image
+                source={{ uri: studentData?.idCardURL }}
+                style={styles.idCardImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </Modal>
 
           <View style={styles.modalActions}>
             {!studentData ? (
@@ -266,6 +296,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     marginBottom: 12,
+  },
+  idCardLink: {
+    textDecorationLine: 'underline',
+    color: '#66A5FF',
+  },
+  idCardImage: {
+    width: '90%',
+    height: '70%',
+    borderRadius: 8,
   },
   modalActions: {
     flexDirection: 'row',

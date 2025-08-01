@@ -35,6 +35,7 @@ const SecurityDashboard = () => {
   const [fetchingStudent, setFetchingStudent] = useState(false);
   const [confirmingEntry, setConfirmingEntry] = useState(false);
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [idCardModalVisible, setIdCardModalVisible] = useState(false); // new state
 
   useEffect(() => {
     const getSecurityData = async () => {
@@ -76,7 +77,11 @@ const SecurityDashboard = () => {
       setStudentData(null);
 
       const studentsRef = collection(db, 'users');
-      const q = query(studentsRef, where('rollNumber', '==', rollNum.trim()), where('role', '==', 'student'));
+      const q = query(
+        studentsRef,
+        where('rollNumber', '==', rollNum.trim()),
+        where('role', '==', 'student')
+      );
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -102,16 +107,11 @@ const SecurityDashboard = () => {
 
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
     try {
-      // Parse the QR code data as JSON
       const qrData = JSON.parse(result.data);
-
-      // Ensure the QR code contains a roll number
       if (!qrData.rollNumber) {
         Alert.alert('Error', 'Invalid QR code: Roll number not found.');
         return;
       }
-
-      // Use the roll number to fetch student details
       const rollNum = qrData.rollNumber;
       setRollNumber(rollNum);
       fetchStudentDetails(rollNum);
@@ -168,12 +168,14 @@ const SecurityDashboard = () => {
         end={{ x: 0, y: 1 }}
       />
 
+      {/* Manual Entry Component */}
       <ManualEntry
         visible={manualEntryVisible}
         onClose={() => setManualEntryVisible(false)}
         onEntryRegistered={() => {}}
       />
 
+      {/* Sidebar & Profile */}
       <Sidebar
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
@@ -181,7 +183,6 @@ const SecurityDashboard = () => {
         onProfilePress={() => setProfileModalVisible(true)}
         activeMenuItem="Dashboard"
       />
-
       <ProfileModal
         isVisible={profileModalVisible}
         onClose={() => setProfileModalVisible(false)}
@@ -189,7 +190,7 @@ const SecurityDashboard = () => {
         loading={loading}
       />
 
-      {/* Camera Scanner Modal */}
+      {/* QR Scanner Modal */}
       <Modal
         visible={cameraModalVisible}
         animationType="slide"
@@ -202,7 +203,7 @@ const SecurityDashboard = () => {
         />
       </Modal>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal with ID Card View */}
       <Modal
         visible={confirmationModalVisible}
         animationType="slide"
@@ -213,8 +214,7 @@ const SecurityDashboard = () => {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Confirm Late Entry</Text>
             {studentData && (
-              <>
-                {/* Display Student Photo */}
+              <> 
                 {studentData.imageUrl ? (
                   <Image
                     source={{ uri: studentData.imageUrl }}
@@ -235,6 +235,14 @@ const SecurityDashboard = () => {
                 <Text style={styles.modalText}>
                   <Text style={styles.label}>Entry Type:</Text> QR
                 </Text>
+
+                {/* View ID Card Link */}
+                {studentData.idCardURL && (
+                  <TouchableOpacity onPress={() => setIdCardModalVisible(true)}>
+                    <Text style={[styles.modalText, styles.idCardLink]}>View Student ID Card</Text>
+                  </TouchableOpacity>
+                )}
+
               </>
             )}
             <View style={styles.modalActions}>
@@ -260,6 +268,22 @@ const SecurityDashboard = () => {
         </View>
       </Modal>
 
+      {/* ID Card Modal */}
+      <Modal
+        visible={idCardModalVisible}
+        transparent={true}
+        onRequestClose={() => setIdCardModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setIdCardModalVisible(false)}>
+          <Image
+            source={{ uri: studentData?.idCardURL }}
+            style={styles.idCardImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Main Dashboard UI */}
       <Header
         name={name}
         securityId={securityId}
@@ -270,37 +294,19 @@ const SecurityDashboard = () => {
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
           <Text style={styles.subtitle}>Security Control Panel</Text>
-
           <View style={styles.cardsContainer}>
-            {/* Manual Entry Card */}
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => setManualEntryVisible(true)}
-            >
-              <View style={styles.cardIconContainer}>
-                <Edit size={30} color="#66A5FF" />
-              </View>
+            <TouchableOpacity style={styles.card} onPress={() => setManualEntryVisible(true)}>
+              <View style={styles.cardIconContainer}><Edit size={30} color="#66A5FF" /></View>
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>Manual Entry</Text>
-                <Text style={styles.cardText}>
-                  Enter roll number to manually record late entry
-                </Text>
+                <Text style={styles.cardText}>Enter roll number to manually record late entry</Text>
               </View>
             </TouchableOpacity>
-
-            {/* QR Scan Card */}
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => setCameraModalVisible(true)}
-            >
-              <View style={styles.cardIconContainer}>
-                <QrCode size={30} color="#66A5FF" />
-              </View>
+            <TouchableOpacity style={styles.card} onPress={() => setCameraModalVisible(true)}>
+              <View style={styles.cardIconContainer}><QrCode size={30} color="#66A5FF" /></View>
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>Scan QR Code</Text>
-                <Text style={styles.cardText}>
-                  Use camera to scan student QR code
-                </Text>
+                <Text style={styles.cardText}>Use camera to scan student QR code</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -312,142 +318,31 @@ const SecurityDashboard = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    position: 'relative',
-  },
-  background: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  subtitle: {
-    fontSize: 22,
-    color: '#B8C2FF',
-    marginBottom: 30,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  cardsContainer: {
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(102, 165, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  cardText: {
-    color: '#B8C2FF',
-    fontSize: 16,
-    marginBottom: 10,
-    lineHeight: 22,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContainer: {
-    backgroundColor: '#1A2980',
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  modalText: {
-    color: '#B8C2FF',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    backgroundColor: '#66A5FF',
-    borderRadius: 8,
-    padding: 12,
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(255, 83, 83, 0.8)',
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  studentPhoto: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  photoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#B8C2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  photoPlaceholderText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, position: 'relative' },
+  background: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+  scrollView: { flex: 1 },
+  content: { padding: 20, paddingTop: 20, paddingBottom: 40 },
+  subtitle: { fontSize: 22, color: '#B8C2FF', marginBottom: 30, textAlign: 'center', fontWeight: '600' },
+  cardsContainer: { marginBottom: 20 },
+  card: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 20, width: '100%', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', alignItems: 'center' },
+  cardIconContainer: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(102,165,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  cardContent: { flex: 1 },
+  cardTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
+  cardText: { color: '#B8C2FF', fontSize: 16, marginBottom: 10, lineHeight: 22 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContainer: { backgroundColor: '#1A2980', borderRadius: 12, padding: 20, width: '100%', maxWidth: 400 },
+  modalTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  modalText: { color: '#B8C2FF', fontSize: 16, marginBottom: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'space-between' },
+  actionButton: { backgroundColor: '#66A5FF', borderRadius: 8, padding: 12, flex: 1, alignItems: 'center', marginHorizontal: 5 },
+  actionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  cancelButton: { backgroundColor: 'rgba(255,83,83,0.8)' },
+  label: { fontWeight: 'bold', color: '#FFFFFF' },
+  studentPhoto: { width: 100, height: 100, borderRadius: 50, marginBottom: 16, alignSelf: 'center' },
+  photoPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#B8C2FF', justifyContent: 'center', alignItems: 'center', marginBottom: 16, alignSelf: 'center' },
+  photoPlaceholderText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
+  idCardLink: { textDecorationLine: 'underline', color: '#66A5FF', marginBottom: 12 },
+  idCardImage: { width: '90%', height: '70%', borderRadius: 8 },
 });
 
 export default SecurityDashboard;

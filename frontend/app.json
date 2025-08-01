@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "CampusFlow",
+    "slug": "campusflow",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/iiit.jpg",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,7 +15,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.harsh_ch21.frontend"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +41,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "beb2737b-89fd-464b-94ab-338c1bdf629e"
+      }
     }
   }
 }
